@@ -1,4 +1,4 @@
-from launcher import Submitter, Launcher
+from launcher import FlagStatus, Submitter, Launcher
 from requests import get
 from random import shuffle
 from time import time
@@ -7,6 +7,7 @@ from pwn import remote, context
 
 INFO_ENDPOINT = 'http://10.10.254.254/competition/teams.json'
 TEAM_FR = 10
+
 
 class ECSCSubmitter(Submitter):
     def __init__(self) -> None:
@@ -18,14 +19,15 @@ class ECSCSubmitter(Submitter):
         self.io.recvline()
         self.io.recvline()
 
-    def submit(self, flag: str) -> tuple[bool, str]:
+    def submit(self, flag: str) -> tuple[FlagStatus, str]:
         self.io.sendline(flag)
-        res = self.io.recvline(False)
-        return b'OK' in res, res.decode()
+        res = self.io.recvline(False).decode()
+        return FlagStatus.from_str(res.split(' ')[1]), res
 
     def close(self):
         self.io.close()
         context.log_level = self.old_level
+
 
 class ECSCLauncher(Launcher):
     def __init__(self) -> None:
@@ -33,6 +35,10 @@ class ECSCLauncher(Launcher):
         self.last_refresh = 0
 
     def refresh(self):
+        #
+        # If you don't need flag ids, comment the if statement and everything in it
+        # If you still needs the team list (and they are constant, which they probably should), set it with `self.teams = [...]`
+        #        
         now = time()
 
         if now - self.last_refresh > 3: # refresh every 3 seconds
@@ -55,7 +61,7 @@ class ECSCLauncher(Launcher):
 
     def get_team_ids(self) -> list:
         self.refresh()
-        shuffle(self.teams) # Don't attack the same teams in the same order accross broadcasts
+        shuffle(self.teams)
         return self.teams
 
     def id_to_ip(self, id: str) -> str:
